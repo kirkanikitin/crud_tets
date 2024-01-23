@@ -1,0 +1,150 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final CollectionReference notes = FirebaseFirestore.instance.collection('users');
+  final textController = TextEditingController();
+
+  Future<void> addNote(String note) {
+    return notes.add({
+      'info': note,
+      'timestamp': Timestamp.now(),
+    });
+  }
+
+  Stream<QuerySnapshot> getNotesStream() {
+    final notesStream =
+      notes.orderBy('timestamp',descending: true).snapshots();
+
+    return notesStream;
+  }
+
+  Future<void> updataNote(String docID, String newNote) {
+    return notes.doc(docID).update({
+      'info': newNote,
+    });
+  }
+
+  Future<void> deleteNote(String docID) {
+    return notes.doc(docID).delete();
+  }
+
+  void openNoteBox({String? docID}) {
+    showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          content: TextField(
+            controller: textController,
+          ),
+          actions: [
+            ElevatedButton(
+                onPressed: () {
+                  if (docID == null) {
+                    addNote(textController.text);
+                  } else {
+                    updataNote(docID, textController.text);
+                  }
+                  textController.clear();
+                  Navigator.pop(context);
+                },
+                child: const Text('Add')
+            )
+          ],
+        )
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: GestureDetector(
+          onTap: openNoteBox,
+          child: Container(
+            padding:  const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.blueGrey[100]
+            ),
+              child: Text(
+                'Добавить',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey[700],
+                ),
+              ),
+          ),
+        ),
+      ),
+      backgroundColor: Colors.blueGrey[50],
+      appBar: AppBar(
+        backgroundColor: Colors.blueGrey[100],
+        elevation: 0,
+        iconTheme: IconThemeData(
+          color: Colors.blueGrey[700],
+        ),
+      ),
+      drawer: Drawer(
+        elevation: 0,
+        backgroundColor: Colors.blueGrey[50],
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: getNotesStream(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            List notesList = snapshot.data!.docs;
+            return ListView.builder(
+                itemCount: notesList.length,
+                itemBuilder: (context, index) {
+                  DocumentSnapshot document = notesList[index];
+                  String docID = document.id;
+
+                  Map<String, dynamic> data =
+                      document.data() as Map<String, dynamic>;
+                  String noteText = data['info'];
+
+                  return Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Container(
+                          decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: Colors.blueGrey),
+                              borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: ListTile(
+                            title: Text(noteText),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                    onPressed: () => openNoteBox(docID: docID),
+                                    icon: const Icon(Icons.settings)
+                                ),
+                                IconButton(
+                                    onPressed: () => deleteNote(docID),
+                                    icon: const Icon(Icons.delete, color: Colors.redAccent)
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                );
+          } else {
+            return const Text('no notes..');
+          }
+        },
+      ),
+    );
+  }
+}
